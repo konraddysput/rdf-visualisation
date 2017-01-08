@@ -14,7 +14,7 @@ namespace RDFGraph.Web.Common
         {
             IGraph graph = new Graph();
             UriLoader.Load(graph, new Uri("http://dbpedia.org/resource/Barack_Obama"));
-            return graph.Triples.Select(n => new TripleViewModel()
+            return graph.Triples.Take(50).Select(n => new TripleViewModel()
             {
                 Subject = n.Subject,
                 Predicate = n.Predicate,

@@ -16,9 +16,9 @@ namespace RDFGraph.Web.Common
             UriLoader.Load(graph, new Uri("http://dbpedia.org/resource/Barack_Obama"));
             return graph.Triples.Take(50).Select(n => new TripleViewModel()
             {
-                Subject = n.Subject,
-                Predicate = n.Predicate,
-                Object = n.Object
+                Subject = n.Subject.ToString(),
+                Predicate = n.Predicate.ToString(),
+                Object = n.Object.ToString()
             });
         }
     }

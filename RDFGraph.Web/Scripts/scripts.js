@@ -1,56 +1,51 @@
-﻿function getData() {
-    var relations = null;
-    var nodes = null;
-    var uri = $("#url").val();
-    //if (!uri) {
-    //    toastr.warning("Podaj adres URI");
-    //    return;
-    //}
-    $.ajax({
-        type: "POST",
-        url: "/Read",
-        data: {
-            url: uri
-        },
-        success: function (data) {
-            var tmp = _.uniq(_.map(data, function (item) {
-                return { data: { id: item.Object } };
-            }));
-            var tmp2 = _.uniq(_.map(data, function (item) {
-                return { data: { id: item.Subject } };
-            }));
-            nodes = _.concat(tmp, tmp2);
-
-            relations = _.map(data, function (item) {
-                return { data: { source: item.Object, target: item.Subject, label: item.Predicate } };
-            });
-
-            setGraph(nodes, relations);
-        },
-        error: function () {
-            toastr.error("Podano niewłaściwy adres URI");
-        }
-    });
-
+﻿function itemToRelation(item) {
+    return { data: { source: item.Subject, target: item.Object, label: uriToLabel(item.Predicate) } };
 }
 
-function setGraph(all_nodes, all_edges) {
-    var graph_container = window.testing = cytoscape({
+function itemToNode(item) {
+    return { data: { id: item.Subject, label: uriToLabel(item.Subject) } };
+}
+
+function isProperty(item) {
+    var result = item.Predicate.startsWith("http://dbpedia.org/property");
+    return result;
+}
+
+function isChildOf(item, source) {
+    return item.Object === source;
+}
+
+function notInGraph(item) {
+    return !nodesInGraph[item.Subject] === true;
+}
+
+function onSearchButtonClick() {
+    var uri = $("#url").val();
+    getData(uri);
+}
+
+function onClick(event) {
+    getData(this.id());
+}
+
+function uriToLabel(uri) {
+    var split = uri.split("/");
+    return split[split.length - 1];
+}
+
+function init() {
+    $("#graph-container").css({ "width": "100%", "height": "700px" });
+    window.graph = cytoscape({
         container: document.getElementById('graph-container'),
 
         boxSelectionEnabled: false,
         autounselectify: true,
 
-        layout: {
-            name: 'breadthfirst',
-            directed: false
-        },
-
         style: [
             {
                 selector: 'node',
                 style: {
-                    'content': 'data(id)',
+                    'content': 'data(label)',
                     'text-opacity': 0.5,
                     'text-valign': 'center',
                     'text-halign': 'right',
@@ -72,9 +67,72 @@ function setGraph(all_nodes, all_edges) {
         ],
 
         elements: {
-            nodes: all_nodes,
-            edges: all_edges
+            nodes: [],
+            edges: []
         },
     });
-    $("#graph-container").css({ "width": "100%", "height": "500px" });
+    window.graph.on("click", "node", onClick);
 }
+
+var rootAdded = false;
+var nodesInGraph = {};
+var nodesExpanded = {};
+
+function getData(uri) {
+    if (!uri) {
+        uri = "http://dbpedia.org/resource/JavaScript";
+    }
+    if (nodesExpanded[uri] === true) return;
+    nodesExpanded[uri] = true;
+    $.ajax({
+        type: "POST",
+        url: "/Read",
+        data: {
+            url: uri
+        },
+        success: function (data) {
+            if (data.size === 0) return;
+            console.log(data);
+            var root = [{ data: { id: uri, label: uriToLabel(uri) } }];
+            var properties = _.filter(data, isProperty);
+            var children = _.map(_.filter(properties, function (item) {
+                    var result = item.Object === uri;
+                    return result;
+                    }),
+                itemToNode
+                );
+
+            var nodes = _.filter(children, notInGraph);
+            if(!rootAdded) {
+                nodes = _.concat(root, children);
+            }
+            var len = nodes.size;
+            for (var i = 0; i < len; i++) {
+                nodesInGraph[nodes[i]] = true;
+            }
+
+            var relations = _.map(properties, itemToRelation);
+
+            addToGraph(nodes, relations);
+            var options = {
+                name: "dagre",
+                randomise: true,
+                animate: true,
+                fit: true,
+                rankSep: 200,
+            };
+            window.graph.layout(options);
+        },
+        error: function () {
+            toastr.error("Podano niewłaściwy adres URI");
+        }
+    });
+
+}
+
+function addToGraph(all_nodes, all_edges) {
+    window.graph.add(all_nodes)
+    window.graph.add(all_edges);
+}
+
+window.onload = init;

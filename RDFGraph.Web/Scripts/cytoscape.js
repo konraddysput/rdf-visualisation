@@ -10285,7 +10285,9 @@ CoseLayout.prototype.run = function(){
       // If both centers are the same, apply a random force
       if( 0 === directionX && 0 === directionY ){
         // s += "\nNodes have the same position.";
-        return; // TODO could be improved with random force
+        //return; // TODO could be improved with random force
+          directionX = Math.random() - 0.5;
+          //directionY = Math.random() - 0.5;
       }
 
       var overlap = nodesOverlap( node1, node2, directionX, directionY );

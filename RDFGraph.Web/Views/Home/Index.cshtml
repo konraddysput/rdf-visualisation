@@ -1,13 +1,12 @@
 ﻿
 <div class="row">
-    <div class="col-md-3 col-md-offset-2">
-        <label>Podaj adres strony do analizy</label>
-    </div>
     <div class="col-md-4">
         <input type="url" pattern="https?://.+" style="width:100%" id="url" />
     </div>
     <div class="col-md-2">
-        <input type="button" onclick="onSearchButtonClick()" value="Szukaj" />
+        <input id="SearchButton" type="button" onclick="onSearchButtonClick()" value="Szukaj" />
+        <input id="FilterButton" type="button" style="display: none" onclick="onFilterButtonClick()" value="Filtruj"/>
+        <input id="ClearFilterButton" type="button" style="display: none" onclick="onClearFilterButtonClick()" value="Wyczyść filtr"/>
     </div>
     <div id="graph-container" style="width:100%" />
 </div>

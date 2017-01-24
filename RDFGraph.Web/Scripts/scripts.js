@@ -3,7 +3,7 @@
 }
 
 function itemToNode(item) {
-    return { data: { id: item.Subject, label: uriToLabel(item.Subject) } };
+    return { data: { id: item.Subject, label: uriToLabel(item.Subject), highlighted: false } };
 }
 
 function isProperty(item) {
@@ -19,9 +19,30 @@ function notInGraph(item) {
     return !nodesInGraph[item.Subject] === true;
 }
 
+function relationNotInGraph(rel) {
+    return !((nodesInGraph[rel.source] === true) && (nodesInGraph[rel.target] === true));
+}
+
 function onSearchButtonClick() {
-    var uri = $("#url").val();
+    document.getElementById("SearchButton").style.display = "none";
+    document.getElementById("FilterButton").style.display = "block";
+    document.getElementById("ClearFilterButton").style.display = "block";
+    console.log("testtest");
+    var textbox = $("#url");
+    var uri = textbox.val();
+    textbox.value = "";
     getData(uri);
+
+}
+
+function onFilterButtonClick() {
+    var query = $("#url").val();
+    filter(query);
+}
+
+function onClearFilterButtonClick() {
+    window.graph.nodes().removeClass("hidden").removeClass("highlighted");
+    relayout();
 }
 
 function onClick(event) {
@@ -49,19 +70,27 @@ function init() {
                     'text-opacity': 0.5,
                     'text-valign': 'center',
                     'text-halign': 'right',
-                    'background-color': '#11479e'
                 }
             },
-
             {
                 selector: 'edge',
                 style: {
                     'width': 2,
                     'target-arrow-shape': 'triangle',
-                    'line-color': '#9dbaea',
-                    'target-arrow-color': '#9dbaea',
                     'curve-style': 'bezier',
                     'label': 'data(label)'
+                }
+            },
+            {
+                selector: 'node.highlighted',
+                style: {
+                    'background-color': '#61bffc'
+                }
+            },
+            {
+                selector: 'node.hidden',
+                style: {
+                    'display': 'none'
                 }
             }
         ],
@@ -93,7 +122,7 @@ function getData(uri) {
         success: function (data) {
             if (data.size === 0) return;
             console.log(data);
-            var root = [{ data: { id: uri, label: uriToLabel(uri) } }];
+            var root = [{ data: { id: uri, label: uriToLabel(uri), highlighted: false } }];
             var properties = _.filter(data, isProperty);
             var children = _.map(_.filter(properties, function (item) {
                     var result = item.Object === uri;
@@ -111,23 +140,104 @@ function getData(uri) {
                 nodesInGraph[nodes[i]] = true;
             }
 
-            var relations = _.map(properties, itemToRelation);
+            var relations = _.filter(_.map(properties, itemToRelation), relationNotInGraph);
 
             addToGraph(nodes, relations);
-            var options = {
-                name: "dagre",
-                randomise: true,
-                animate: true,
-                fit: true,
-                rankSep: 200,
-            };
-            window.graph.layout(options);
+            relayout();
         },
         error: function () {
             toastr.error("Podano niewłaściwy adres URI");
         }
     });
 
+}
+
+function filter(query) {
+    if (query == "") {
+        query = "JavaScript";
+    }
+
+    window.graph.nodes().removeClass("highlighted").addClass("hidden");
+
+    var selectors = query.split(",");
+    for (var i = 0; i < selectors.length; i++) {
+        hightlightSelector(selectors[i].trim().split(" "))
+    }
+    relayout();
+}
+
+function toSelector(label) {
+    if (label === '?') return undefined;
+    return '[label = "' + label + '"]';
+}
+
+function hightlightSelector(selector) {
+    if (selector.length == 0) { return; }
+
+    var graph = window.graph;
+    var root = graph.nodes(toSelector(selector[0]));
+    root.removeClass("hidden");
+    root.addClass("highlighted");
+    var currentSet = root;
+
+    if (selector.length > 1) {
+        processSelector(selector, 2, selector[1], currentSet);
+    }
+}
+
+function processSelector(selector, index, edgeSpec, currentSet) {
+    var newSet;
+    var label = selector[index];
+    console.log(label);
+    index++;
+    if (edgeSpec === '>') {
+        var children = currentSet.outgoers().edges(toSelector(label)).targets();
+        if (index >= selector.length) {
+            newSet = children;
+        }
+        else if (selector[index] === '>') {
+            index++;
+            newSet = children.nodes(toSelector(selector[index]));
+            index++;
+        }
+    }
+    else if (edgeSpec === '<') {
+        var children = currentSet.incomers().edges(toSelector(label)).sources();
+        if (index >= selector.length) {
+            newSet = children;
+        }
+        else if (selector[index] === '<') {
+            index++;
+            newSet = children.nodes(toSelector(selector[index]));
+            index++;
+        }
+    }
+    else if (edgeSpec === '>>') {
+        newSet = currentSet.outgoers().nodes(toSelector(label));
+    }
+    else if (edgeSpec === '<<') {
+        newSet = currentSet.incomers().nodes(toSelector(label));
+    }
+
+    newSet.removeClass("hidden");
+    newSet.addClass("highlighted");
+    if (index < selector.length) {
+        var nextEdgeSpec = selector[index];
+        index++;
+        processSelector(selector, index, nextEdgeSpec, newSet);
+    }
+    
+}
+
+function relayout() {
+    var options = {
+        name: "dagre",
+        randomise: true,
+        animate: true,
+        fit: true,
+        rankSep: 200,
+    };
+    window.graph.layout(options);
 }
 
 function addToGraph(all_nodes, all_edges) {
